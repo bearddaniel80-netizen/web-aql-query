@@ -1,0 +1,16 @@
+.app-layout {
+  display: flex;
+  gap: 24px;
+  min-height: 100vh;
+}
+
+.app-navigation {
+  flex-shrink: 0;
+  padding: 16px;
+}
+
+.app-content {
+  flex: 1;
+  padding: 24px;
+  min-width: 0;
+}
