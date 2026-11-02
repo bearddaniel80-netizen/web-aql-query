@@ -3,6 +3,7 @@
 ## Description
 A secured api/frontend for the AQL platform.
 Features
+- Ad hoc queries
 - System sources
 
 ---
@@ -13,6 +14,12 @@ These endpoint can also be reached with
 curl -ikL localhost
 ```
 while services are running.
+
+### /api/query/submit/{query}
+Creates async job, to execute query
+
+### /api/query/reaults/{jobId}
+Returns results of query.
 
 ### /api/system/list
 Displays all possible system sources.

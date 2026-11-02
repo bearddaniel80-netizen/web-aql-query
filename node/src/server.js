@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { forwardFastapi } from "./middleware/forewardFastapi.js";
+import { forwardFastapi, postFastapi } from "./middleware/forewardFastapi.js";
 import { upload, upload_to_fastapi } from "./utils/fastapi.js";
 
 const app = express();
@@ -17,6 +17,18 @@ app.get(
   "/api/system/:source",
   forwardFastapi(
     (req) => `/api/system/${encodeURIComponent(req.params.source)}`
+  )
+);
+app.get(
+  "/api/query/results/:jobId",
+  forwardFastapi(
+    (req) => `/api/query/results/${encodeURIComponent(req.params.jobId)}`
+  )
+);
+app.post(
+  "/api/query/submit/:query",
+  postFastapi(
+    (req) => `/api/query/submit/${encodeURIComponent(req.params.query)}`
   )
 );
 /*
