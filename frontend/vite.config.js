@@ -18,8 +18,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: resolve(root, "index.html"),
-        query: resolve(root, "query-adv.html"),
-        source: resolve(root, "system-source.html")
+        query-adv: resolve(root, "query-adv.html"),
+        system-source: resolve(root, "system-source.html")
       }
     }
   }
