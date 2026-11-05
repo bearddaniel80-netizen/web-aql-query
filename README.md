@@ -4,6 +4,7 @@
 A secured api/frontend for the AQL platform.
 Features
 - Ad hoc queries
+- Query wizard
 - System sources
 
 ---
@@ -23,6 +24,9 @@ Returns results of query.
 
 ### /api/system/list
 Displays all possible system sources.
+
+### /api/system/fields/{source}
+Returns names of fields in a given source
 
 ### /api/system/{source}
 Shows individual sources.

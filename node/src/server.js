@@ -14,6 +14,12 @@ app.use(cors());
  * ==================================================
  */
 app.get(
+  "/api/system/fields/:source",
+  forwardFastapi(
+    (req) => `/api/system/fields/${encodeURIComponent(req.params.source)}`
+  )
+);
+app.get(
   "/api/system/:source",
   forwardFastapi(
     (req) => `/api/system/${encodeURIComponent(req.params.source)}`
