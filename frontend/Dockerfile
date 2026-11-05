@@ -35,7 +35,7 @@ COPY . .
 
 # To generate docs
 # RUN npm run docs
-
+RUN mkdir -p src/components
 COPY --from=lib /components/react-component-lib src
 
 CMD ["npm", "run", "dev"]
