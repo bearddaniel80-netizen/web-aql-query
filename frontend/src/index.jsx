@@ -6,14 +6,21 @@ import HtmlFragment from "./components/views/HtmlFragmentsView";
 import Navigation from "./components/menu/nav/Navigation";
 import { navigationConfig } from "./navigation";
 
+
 async function myList(endpoint) {
   const response = await fetch(endpoint);
 
   if (!response.ok) {
-    throw new Error("Request failed");
+    throw new Error(`Request failed: ${response.status}`);
   }
 
-  return response.json();
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  return response.text();
 }
 
 function GettingStarted() {
