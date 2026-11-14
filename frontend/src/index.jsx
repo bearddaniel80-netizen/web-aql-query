@@ -29,7 +29,7 @@ function GettingStarted() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    myList("/api/getting-started")
+    myList("/api/index")
       .then(setData)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
