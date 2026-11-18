@@ -1,0 +1,132 @@
+# MinIO in single-node mode: it holds state on a PVC, so it stays at 1 replica.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  serviceName: minio
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: minio
+          image: {{ .Values.minio.image | quote }}
+          args: ["server", "/data", "--console-address", ":9001"]
+          env:
+            - name: MINIO_ROOT_USER_FILE
+              value: /run/secrets/minio_root_user
+            - name: MINIO_ROOT_PASSWORD_FILE
+              value: /run/secrets/minio_root_password
+          ports:
+            - { name: api, containerPort: 9000 }
+            - { name: console, containerPort: 9001 }
+          readinessProbe:
+            httpGet: { path: /minio/health/ready, port: api }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /minio/health/live, port: api }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          {{- with .Values.minio.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: root-secrets, mountPath: /run/secrets, readOnly: true }
+      volumes:
+        - name: root-secrets
+          secret:
+            secretName: {{ .Release.Name }}-minio-root
+            defaultMode: 0440
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.minio.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.minio.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - { name: api, port: 9000, targetPort: api }
+    - { name: console, port: 9001, targetPort: console }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-minio-init
+data:
+  init-minio.sh: |
+{{ .Files.Get "files/init-minio.sh" | indent 4 }}
+  policy.json: |
+{{ .Files.Get "files/policy.json" | indent 4 }}
+---
+# Runs once after install/upgrade (replaces the compose minio-init service).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-minio-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio-init
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-minio
+          image: busybox:1.37
+          command: ["sh", "-c", "until nc -z minio 9000; do echo waiting for minio; sleep 2; done"]
+      containers:
+        - name: minio-init
+          image: {{ .Values.minio.image | quote }}
+          command: ["/bin/sh", "/init-minio.sh"]
+          env:
+            - name: MINIO_ENDPOINT
+              value: {{ .Values.minio.endpoint | quote }}
+          volumeMounts:
+            - { name: scripts, mountPath: /init-minio.sh, subPath: init-minio.sh, readOnly: true }
+            - { name: scripts, mountPath: /policy.json, subPath: policy.json, readOnly: true }
+            - { name: secrets, mountPath: /run/secrets, readOnly: true }
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ .Release.Name }}-minio-init
+            defaultMode: 0555
+        - name: secrets
+          projected:
+            defaultMode: 0440
+            sources:
+              - secret: { name: {{ .Release.Name }}-minio-root }
+              - secret: { name: {{ .Release.Name }}-app-secrets }

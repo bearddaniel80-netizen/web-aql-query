@@ -1,0 +1,48 @@
+{{- if .Values.networkPolicies.enabled }}
+{{- range $name, $app := .Values.apps }}
+{{- if $app.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+  policyTypes: [Ingress]
+  ingress:
+    {{- if $app.allowFromAny }}
+    - {}
+    {{- else }}
+    - from:
+        {{- range $app.allowFrom }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ . }}
+              app.kubernetes.io/instance: {{ $.Release.Name }}
+        {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- range tuple "node" "fastapi" "minio-init" }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ . }}
+              app.kubernetes.io/instance: {{ $.Release.Name }}
+        {{- end }}
+{{- end }}

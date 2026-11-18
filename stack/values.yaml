@@ -1,0 +1,86 @@
+environment: production     # compose ${ENVIRONMENT}
+target: production          # compose ${TARGET} (build stage; bake into your image tags)
+imagePullPolicy: IfNotPresent
+
+minio:
+  endpoint: minio:9000      # compose ${MINIO_ENDPOINT}
+  bucket: ""                # compose ${MINIO_BUCKET}  (required)
+  image: pgsty/minio:latest # pin a real tag in production
+  storage: 20Gi
+  storageClassName: ""
+  resources: {}
+
+# Compose "secrets:" files -> one Kubernetes Secret per trust level.
+# Supply at install time (--set / -f secrets.yaml), never commit real values.
+secrets:
+  fastapiInternalKey: ""
+  minioAppUser: ""
+  minioAppPassword: ""
+  minioRootUser: ""
+  minioRootPassword: ""
+
+networkPolicies:
+  enabled: true             # needs a CNI that enforces NetworkPolicy (Calico, Cilium...)
+
+# Stateless services. Each one becomes a Deployment + Service named after its key,
+# so in-cluster DNS names (frontend, node, fastapi) match the compose ones.
+apps:
+  caddy:
+    enabled: true
+    replicas: 3
+    image: { repository: registry.example.com/caddy, tag: latest }
+    ports:
+      - { name: http,      port: 80,  protocol: TCP }
+      - { name: https,     port: 443, protocol: TCP }
+      - { name: https-udp, port: 443, protocol: UDP }
+    service: { type: LoadBalancer }
+    secrets: false
+    emptyDirs:
+      - { name: caddy-data,   mountPath: /data }
+      - { name: caddy-config, mountPath: /config }
+    allowFromAny: true
+    env: {}
+    resources: {}
+
+  frontend:
+    enabled: true
+    replicas: 3
+    image: { repository: registry.example.com/frontend, tag: latest }
+    ports:
+      - { name: http, port: 80, protocol: TCP }   # change to whatever your frontend image listens on
+    service: { type: ClusterIP }
+    secrets: false
+    allowFrom: [caddy]
+    env: {}
+    resources: {}
+
+  node:
+    enabled: true
+    replicas: 3
+    image: { repository: registry.example.com/node, tag: latest }
+    ports:
+      - { name: http, port: 4000, protocol: TCP }
+    service: { type: ClusterIP }
+    secrets: true
+    allowFrom: [caddy]
+    env:
+      NODE_ENV: "{{ .Values.environment }}"
+      FASTAPI_URL: http://fastapi:8000
+      MINIO_ENDPOINT: "{{ .Values.minio.endpoint }}"
+      MINIO_BUCKET: "{{ .Values.minio.bucket }}"
+    resources: {}
+
+  fastapi:
+    enabled: true
+    replicas: 3
+    image: { repository: registry.example.com/fastapi, tag: latest }
+    ports:
+      - { name: http, port: 8000, protocol: TCP }
+    service: { type: ClusterIP }
+    secrets: true
+    allowFrom: [node]
+    env:
+      ENVIRONMENT: "{{ .Values.environment }}"
+      MINIO_ENDPOINT: "{{ .Values.minio.endpoint }}"
+      MINIO_BUCKET: "{{ .Values.minio.bucket }}"
+    resources: {}
